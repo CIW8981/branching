@@ -1,1 +1,1 @@
-cart: total rounding=floor discount=0
+cart: total rounding=round discount=0
