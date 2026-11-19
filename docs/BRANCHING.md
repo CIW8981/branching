@@ -10,7 +10,7 @@ This guide describes the branching strategy the team uses for multiple deploymen
 | `develop` | Staging. Integration of finished features. | n/a | `main` |
 | `feature/*` | Development work. | `develop` | `develop` |
 | `release/*` | Optional. Ships only the ready work when `develop` also holds unfinished work. | `main` | `main` |
-| `sync/*` | Brings `main` back into `develop` after anything lands on `main` (a release or a hotfix). | `main` | `develop` |
+| `sync/*` | Brings `main` back into `develop` after a release or hotfix merges into `main`. | `main` | `develop` |
 | `revert/*` | Removes a small amount of unfinished work from `develop`. | `develop` | `develop` |
 | `hotfix/*` | Urgent production fix. | `main` | `main` only |
 | `resolve/*` | Resolves a conflict on a `develop → main` PR. | `develop` | `develop` |
@@ -55,7 +55,7 @@ The repository must allow both squash merges and merge commits. Do not turn on "
 
 These rules come from the strategy decisions and from the scenarios in section 6.
 
-1. **Always sync after anything lands on `main`.** After a release or a hotfix merges into `main`, open a `sync/*` PR from `main` into `develop`, using a merge commit. Skipping the sync made the next `develop → main` PR conflict.
+1. **After a release or hotfix merges into `main`, sync `main` into `develop`.** Open a `sync/*` PR from `main` into `develop` with a merge commit. This gives `develop` the release or hotfix changes. You don't need a sync after a `develop → main` merge. Skipping the sync after a release made the next `develop → main` PR conflict.
 2. **Fix release bugs on `develop` first.** Merge the fix into `develop` through a PR, then cherry-pick it onto the release branch. A fix committed directly on the release branch made the sync PR conflict, and it would be lost if the release branch had to be rebuilt.
 3. **Ship a dependent feature together with what it depends on.** A ready feature that edits an unfinished feature's file cannot be cherry-picked alone. The cherry-pick conflicts.
 4. **Cherry-pick with `-x`, and list the cherry-picked SHAs in the release PR description.** `-x` records the original commit in the message. The list lets anyone rebuild the release branch.
@@ -164,7 +164,7 @@ Then sync, as in 5.6. If a release PR is open, rebuild it, as in 5.7.
 
 ### 5.6 Sync `main` into `develop`
 
-Run this after every release or hotfix merge into `main`.
+Run this after a release or hotfix merges into `main`. Not needed after `develop → main`.
 
 ```
 git fetch origin
