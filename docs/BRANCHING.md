@@ -18,6 +18,7 @@ This guide describes the branching strategy the team uses for multiple deploymen
 Rules:
 - `main` and `develop` accept changes only through pull requests. Nobody commits to them directly.
 - Merge a conflict on a branch of its own (`resolve/*`, the `sync/*` branch, or a hotfix branch), never on `develop`.
+- Always bring `main` back into `develop` through a `sync/*` branch, whether or not there is a conflict. A direct `main → develop` PR is also an accepted practice and a matter of preference. The team uses `sync/*` every time so nobody has to decide which to use, and a conflict can be resolved on the branch without committing to `main` or `develop`.
 
 ```
 Normal:   feature/* --squash--> develop --merge--> main
@@ -53,7 +54,7 @@ The repository must allow both squash merges and merge commits. Do not turn on "
 
 These rules come from the strategy decisions and from the scenarios in section 6.
 
-1. **Always sync after a release.** After a release branch merges into `main`, open a `sync/*` PR from `main` into `develop`. Skipping the sync made the next `develop → main` PR conflict.
+1. **Always sync after a release.** After a release branch merges into `main`, open a `sync/*` PR from `main` into `develop`, using a merge commit. Skipping the sync made the next `develop → main` PR conflict.
 2. **Fix release bugs on `develop` first.** Merge the fix into `develop` through a PR, then cherry-pick it onto the release branch. A fix committed directly on the release branch made the sync PR conflict.
 3. **Ship a dependent feature together with what it depends on.** A ready feature that edits an unfinished feature's file cannot be cherry-picked alone. The cherry-pick conflicts.
 4. **Cherry-pick with `-x`.** It records the original commit in the message.
