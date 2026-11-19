@@ -1,1 +1,2 @@
 login: form
+login: session timeout=60m
