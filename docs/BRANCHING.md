@@ -66,7 +66,7 @@ When resolving a conflict, keep both sides' changes. Usually `main`'s version wi
 
 ```mermaid
 flowchart LR
-    F["feature/*"] -->|"squash PR"| D["develop"] -->|"merge PR"| M["main"]
+    D["develop"] -->|"cut"| F["feature/*"] -->|"squash PR"| D2["develop"]
 ```
 
 ```
@@ -80,6 +80,11 @@ gh pr merge <n> --squash --subject "<title>"
 ```
 
 ### 4.2 Ship develop → main
+
+```mermaid
+flowchart LR
+    D["develop"] -->|"merge PR"| M["main"]
+```
 
 ```
 gh pr create --base main --head develop --title "<title>"
@@ -168,6 +173,11 @@ Then: [sync](#46-sync-main--develop). If a release PR is open: [rebuild it](#47-
 
 ### 4.6 Sync main → develop
 
+```mermaid
+flowchart LR
+    M["main"] -->|"cut"| S["sync/*"] -->|"merge PR"| D["develop"]
+```
+
 After a release or hotfix merges into `main`:
 
 ```
@@ -189,6 +199,14 @@ git push
 
 ### 4.7 Rebuild an open release
 
+```mermaid
+flowchart LR
+    O["old release/*"] -.->|"close PR, replaced by"| R["new release/*"]
+    M1["latest main"] -->|"cut"| R
+    D["develop"] -.->|"cherry-pick same commits"| R
+    R -->|"merge PR"| M2["main"] -->|"sync/* PR"| D2["develop"]
+```
+
 ```
 gh pr close <old-release-pr> --comment "main changed. Rebuilding the release." --delete-branch
 git fetch origin
@@ -202,6 +220,13 @@ gh pr merge <n> --merge
 Then: [sync](#46-sync-main--develop).
 
 ### 4.8 Resolve a conflict on develop → main
+
+```mermaid
+flowchart LR
+    D["develop"] -->|"cut"| RS["resolve/*"]
+    M["main"] -->|"merge into"| RS
+    RS -->|"merge PR"| D2["develop"] -->|"merge PR"| M2["main"]
+```
 
 Keep the conflicting PR open and fix the conflict on a separate branch:
 
