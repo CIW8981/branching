@@ -1,4 +1,6 @@
-# Git branching strategy
+# Branching and release guide
+
+A Gitflow variant: `main`, `develop`, feature and hotfix branches from Gitflow, with optional cherry-pick release branches cut from `main`.
 
 How the team moves work from development to staging (`develop`) and production (`main`). Start with section 1. Read further only when you need to.
 
