@@ -243,3 +243,17 @@ All scenarios ran on this repository and behaved as described.
 - **Problem:** The open release branch was cut from the old `main`, so it does not contain the fix.
 - **Strategy:** Close the open release PR and cut a new `release/*` from the latest `main`, which already has the fix. Cherry-pick the same commits again, merge, then sync.
 - **Tested:** The new release branch contained the hotfix, the same commit cherry-picked cleanly, and the release PR was mergeable. After the sync, the hotfix change appeared once on `main` and once on `develop`.
+
+## 7. Rules for developers
+
+| Rule | Why |
+|---|---|
+| Ship `develop` to `main` often. | Unfinished work rarely piles up, so a release branch is rarely needed. |
+| Merge into `develop` only work that can ship. Hide unfinished work behind a feature flag, off by default. | `develop` stays shippable without a release branch or a revert. |
+| Remove a feature flag once the feature is live. | Old flags pile up and make the code harder to follow. |
+| Add automated tests in the same PR. Merge only when CI passes. | A passing `develop` can ship without a long manual test cycle. |
+| One feature per PR. Keep it small. | A small squash commit is easy to review, cherry-pick and revert. |
+| State dependencies on other features in the PR description. | A dependent feature can't be cherry-picked alone. It ships with what it depends on. |
+| Never commit to `main`, `develop` or `release/*` directly. Use a PR. | Every change gets reviewed, and the shared branches stay consistent. |
+| Fix release bugs on `develop` first, then cherry-pick. | A fix made on the release branch causes sync conflicts and is lost if the release is rebuilt. |
+| Merge the latest `develop` into your branch before opening the PR. | Conflicts get resolved on your branch, not during the release. |
