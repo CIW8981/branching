@@ -10,24 +10,24 @@ This guide describes the branching strategy the team uses for multiple deploymen
 | `develop` | Staging. Integration of finished features. | n/a | `main` |
 | `feature/*` | Development work. | `develop` | `develop` |
 | `release/*` | Optional. Ships only the ready work when `develop` also holds unfinished work. | `main` | `main` |
-| `sync/*` | Brings `main` back into `develop` after a release. | `main` | `develop` |
+| `sync/*` | Brings `main` back into `develop` after a release or hotfix merges into `main`. | `main` | `develop` |
 | `revert/*` | Removes a small amount of unfinished work from `develop`. | `develop` | `develop` |
-| `hotfix/*` | Urgent production fix. | `main` | `main`, `develop`, and `release/*` if one is open |
+| `hotfix/*` | Urgent production fix. | `main` | `main` only |
 | `resolve/*` | Resolves a conflict on a `develop → main` PR. | `develop` | `develop` |
 
 Rules:
 - `main` and `develop` accept changes only through pull requests. Nobody commits to them directly.
-- Merge a conflict on a branch of its own (`resolve/*`, the `sync/*` branch, or a hotfix branch), never on `develop`.
+- Resolve a conflict on a branch of its own (`resolve/*` or the `sync/*` branch), never on `develop`.
 - Always bring `main` back into `develop` through a `sync/*` branch, whether or not there is a conflict. A direct `main → develop` PR is also an accepted practice and a matter of preference. The team uses `sync/*` every time so nobody has to decide which to use, and a conflict can be resolved on the branch without committing to `main` or `develop`.
+- A release branch is always cut from the latest `main`. If `main` changes while a release PR is open, close it and cut a new release branch.
 
 ```
 Normal:   feature/* --squash--> develop --merge--> main
 Release:  main --cut--> release/* <--cherry-pick -x-- develop (ready only)
           release/* --merge--> main --cut--> sync/* --merge--> develop
 Revert:   develop --cut--> revert/* --squash--> develop --merge--> main
-Hotfix:   main --cut--> hotfix/* --merge--> main
-                            |-----merge--> develop
-                            |-----merge--> release/*   (only if open)
+Hotfix:   main --cut--> hotfix/* --merge--> main --cut--> sync/* --merge--> develop
+          open release PR: close it, cut a new release/* from main, cherry-pick again
 Conflict: develop --cut--> resolve/* (merge origin/main) --merge--> develop
 ```
 
@@ -37,9 +37,9 @@ Conflict: develop --cut--> resolve/* (merge origin/main) --merge--> develop
 |---|---|---|
 | `feature/*` → `develop` | Squash | One commit per feature. A single commit is easy to cherry-pick and to revert. |
 | `revert/*` → `develop` | Squash | Same reason. |
-| Everything else (`develop → main`, `release/* → main`, `sync/* → develop`, `hotfix/* → main`, `hotfix/* → develop`, `hotfix/* → release/*`, `resolve/* → develop`) | Merge commit | `main` and `develop` keep shared history. GitHub documents that a branch squash-merged and then continued shows its old commits again in later PRs and can conflict repeatedly. |
+| Everything else (`develop → main`, `release/* → main`, `hotfix/* → main`, `sync/* → develop`, `resolve/* → develop`) | Merge commit | `main` and `develop` keep shared history. GitHub documents that a branch squash-merged and then continued shows its old commits again in later PRs and can conflict repeatedly. |
 
-The repository must allow both squash merges and merge commits. Do not turn on "require linear history" for `main` or `develop`, because merge commits would fail.
+The repository must allow both squash merges and merge commits. Do not turn on "require linear history" for `main` or `develop`, because merge commits would fail. "Automatically delete head branches" can be on or off. No flow reuses a branch after its PR merges. The one exception is continuing a reverted feature on its original branch (section 5.4). If auto-delete is on, re-add reverted work with the revert-the-revert method instead.
 
 ## 3. Which path to take
 
@@ -48,20 +48,21 @@ The repository must allow both squash merges and merge commits. Do not turn on "
 | Everything on `develop` is ready | `develop → main` directly. |
 | Several items on `develop` are unfinished | Release branch: cut from `main`, cherry-pick only the ready commits, merge to `main`, then sync. |
 | One or two items on `develop` are unfinished | Revert them on `develop`, then `develop → main`. |
-| Urgent production bug | Hotfix branch. |
+| Urgent production bug | Hotfix into `main`, then sync into `develop`. |
+| `main` changed while a release PR is open | Close the release PR and cut a new release branch from `main` with the same cherry-picks. |
 
 ## 4. Rules shown by the tests
 
 These rules come from the strategy decisions and from the scenarios in section 6.
 
-1. **Always sync after a release.** After a release branch merges into `main`, open a `sync/*` PR from `main` into `develop`, using a merge commit. Skipping the sync made the next `develop → main` PR conflict.
-2. **Fix release bugs on `develop` first.** Merge the fix into `develop` through a PR, then cherry-pick it onto the release branch. A fix committed directly on the release branch made the sync PR conflict.
+1. **After a release or hotfix merges into `main`, sync `main` into `develop`.** Open a `sync/*` PR from `main` into `develop` with a merge commit. This gives `develop` the release or hotfix changes. You don't need a sync after a `develop → main` merge. Skipping the sync after a release made the next `develop → main` PR conflict.
+2. **Fix release bugs on `develop` first.** Merge the fix into `develop` through a PR, then cherry-pick it onto the release branch. A fix committed directly on the release branch made the sync PR conflict, and it would be lost if the release branch had to be rebuilt.
 3. **Ship a dependent feature together with what it depends on.** A ready feature that edits an unfinished feature's file cannot be cherry-picked alone. The cherry-pick conflicts.
-4. **Cherry-pick with `-x`.** It records the original commit in the message.
+4. **Cherry-pick with `-x`, and list the cherry-picked SHAs in the release PR description.** `-x` records the original commit in the message. The list lets anyone rebuild the release branch.
 5. **Use one revert PR per feature.** That lets you undo each revert separately.
 6. **Keep the original branch if you plan to continue a squashed feature.** Continuing it later gives a mergeable PR.
-7. **A hotfix reaches `main` and `develop`.** If a release branch is open, it also goes into the release branch before the release merges.
-8. **Resolve a conflicting hotfix → `develop` PR on a branch cut from the hotfix branch.** Never resolve it on `develop`.
+7. **A hotfix merges into `main` only.** `develop` gets it through the sync. The hotfix branch is not needed after its merge, so auto-delete is safe.
+8. **If `main` changes while a release PR is open, rebuild the release.** Close the PR, delete the branch, cut a new `release/*` from the latest `main`, and cherry-pick the same commits.
 
 ## 5. Command cookbook
 
@@ -89,29 +90,16 @@ git fetch origin
 git checkout -b release/<id> origin/main
 git cherry-pick -x <sha-of-ready-feature-1> <sha-of-ready-feature-2>
 git push -u origin release/<id>
-gh pr create --base main --head release/<id> --title "<title>"
-gh pr merge <n> --merge
-
-# sync main back into develop
-git fetch origin
-git checkout -b sync/<id> origin/main
-git push -u origin sync/<id>
-gh pr create --base develop --head sync/<id> --title "<title>"
+gh pr create --base main --head release/<id> --title "<title>" \
+  --body "Cherry-picks: <sha-of-ready-feature-1> <sha-of-ready-feature-2>"
 gh pr merge <n> --merge
 ```
 
-If the sync PR conflicts, merge `develop` into the sync branch, keep `main`'s version of the conflicted files, commit, push, and then merge the PR:
-
-```
-git merge origin/develop
-# resolve, then
-git add <files> && git commit
-git push
-```
+Then sync, as in 5.6.
 
 ### 5.3 Direct `develop → main` after unfinished work is finished
 
-Use the normal flow in 5.1 after the sync from 5.2 is done.
+Use the normal flow in 5.1 after the sync from 5.6 is done.
 
 If the sync was skipped and the PR conflicts:
 
@@ -168,49 +156,104 @@ git fetch origin
 git checkout -b hotfix/<name> origin/main
 # fix and commit
 git push -u origin hotfix/<name>
-
 gh pr create --base main --head hotfix/<name> --title "<title>"
 gh pr merge <n> --merge
-gh pr create --base develop --head hotfix/<name> --title "<title>"
-gh pr merge <n> --merge
-
-# only if a release branch is open
-gh pr create --base release/<id> --head hotfix/<name> --title "<title>"
-gh pr merge <n> --merge
 ```
 
-If the PR into `develop` conflicts:
+Then sync, as in 5.6. If a release PR is open, rebuild it, as in 5.7.
+
+### 5.6 Sync `main` into `develop`
+
+Run this after a release or hotfix merges into `main`. Not needed after `develop → main`.
 
 ```
-gh pr close <n> --comment "Conflicts with develop; resolved on a separate branch."
 git fetch origin
-git checkout -b hotfix/<name>-develop origin/hotfix/<name>
+git checkout -b sync/<id> origin/main
+git push -u origin sync/<id>
+gh pr create --base develop --head sync/<id> --title "<title>"
+gh pr merge <n> --merge
+```
+
+If the sync PR conflicts, merge `develop` into the sync branch, keep `main`'s version of the conflicted files, commit, push, and then merge the PR:
+
+```
 git merge origin/develop
 # resolve, then
 git add <files> && git commit
-git push -u origin hotfix/<name>-develop
-gh pr create --base develop --head hotfix/<name>-develop --title "<title>"
+git push
+```
+
+### 5.7 Rebuild an open release after `main` changed
+
+```
+gh pr close <old-release-pr> --comment "main changed. Rebuilding the release from the latest main." --delete-branch
+git fetch origin
+git checkout -b release/<new-id> origin/main
+git cherry-pick -x <same SHAs as the closed release PR>
+git push -u origin release/<new-id>
+gh pr create --base main --head release/<new-id> --title "<title>" --body "Cherry-picks: <SHAs>"
 gh pr merge <n> --merge
 ```
 
+Then sync, as in 5.6.
+
 Delete temporary branches when they are no longer needed.
 
-## 6. Scenarios covered
+## 6. Why this strategy: scenarios tested
 
-All scenarios ran on this repository in one run (`full1`, PRs #53 to #100). Each ended with `main` and `develop` carrying identical content, except where a release leaves unfinished work on `develop` by design (scenario 2).
+All scenarios ran on this repository and behaved as described.
 
-| # | Scenario | What was done | Result |
-|---|---|---|---|
-| 1 | Normal flow | Two features squash-merged into `develop`, then one `develop → main` PR. | Both features reached `main`. Each feature is one commit on `develop`. |
-| 2a | Release with only the ready work | Five features on `develop`: two ready, two unfinished, and one ready but dependent on an unfinished one. A release branch was cut from `main`, the ready commits were cherry-picked, and the release was merged and synced. | `main` held only the ready work. The sync was clean. |
-| 2b | Dependent feature | The cherry-pick of the dependent feature was attempted alone. | It conflicted. The feature must ship with what it depends on. |
-| 2c | Fix on the release branch | A fix was committed directly on the release branch, then merged and synced. | The sync PR conflicted. It was resolved on the `sync/*` branch. |
-| 2d | Release fix on `develop` first | A fix to a ready feature was merged into `develop`, then cherry-picked onto the release. | Clean. |
-| 3a | Direct `develop → main` | After the unfinished features were completed, `develop` was merged straight into `main`. | The PR was mergeable. `main` held all features. |
-| 3b | Release without sync | A release skipped the sync, the shipped feature was extended on `develop`, and `develop → main` was opened. | The PR conflicted. A `resolve/*` branch fixed it. |
-| 4a | Revert unfinished work | Two unfinished features were reverted through separate PRs, then `develop` was shipped. | `main` had the ready feature and not the reverted ones. |
-| 4b | Re-add by reverting the revert | The revert commit was reverted in a new PR. | Mergeable. The original content returned. |
-| 4c | Re-add by continuing the original branch | More commits were added to the kept feature branch and a new PR was opened. | Mergeable. Original and new content were both present. |
-| 5a | Basic hotfix | Hotfix merged into `main`, then into `develop`. | Both branches got the fix. |
-| 5b | Conflicting hotfix | `develop` had changed the same line. The hotfix PR into `develop` was opened. | It conflicted. It was resolved on a branch cut from the hotfix branch, and the next `develop → main` PR was mergeable. |
-| 5c | Hotfix during an open release | Hotfix merged into `main`, the open release branch, and `develop`. The release was then merged and synced. | The release PR was mergeable. The hotfix change appeared once on `main` and `develop`. |
+### Scenario 1: `develop` has ready and finished work
+- **Problem:** Everything on `develop` is ready and finished. How does it reach production?
+- **Strategy:** Features squash into `develop` (staging). `develop` then merges directly into `main` (production) with a merge commit. No release branch is needed.
+- **Tested:** All features reached `main`, and each feature is one commit on `develop`.
+
+### Scenario 2: `develop` has ready and unfinished work
+- **Problem:** `develop` holds `profile` and `search` (ready) and `payment` and `invoice` (unfinished). Merging `develop` into `main` would ship all four.
+- **Strategy:** Cut `release/*` from `main`, because `main` has none of the unfinished work. Cherry-pick only the ready commits, then merge the release into `main`.
+- **Tested:** `main` got `profile` and `search`. `payment` and `invoice` stayed on `develop`.
+- **Limit found:** `receipt` is ready but edits `payment`'s file. Cherry-picking it alone conflicts, so it ships together with `payment`.
+
+### Scenario 3: `develop` must get the release back
+- **Problem:** After the release, `main` holds commits that `develop` does not share history with.
+- **Strategy:** A `sync/*` PR merges `main` into `develop` after every release.
+- **Tested:** The sync was clean. When we skipped it and then changed a cherry-picked file on `develop`, the next `develop → main` PR conflicted. A `resolve/*` branch fixed it.
+
+### Scenario 4: A bug is found during the release
+- **Problem:** The fix has to land on the release and on `develop`.
+- **Strategy:** Fix it on `develop` first, then cherry-pick the fix onto the release branch.
+- **Tested:** That path was clean. A fix committed directly on the release branch made the sync PR conflict, and we resolved it on the `sync/*` branch.
+
+### Scenario 5: The unfinished work is finished later
+- **Problem:** After the release, `payment` and `invoice` are finished on `develop`. Do we need another release branch?
+- **Strategy:** No. Once everything on `develop` is ready, merge `develop` into `main` directly, as in scenario 1.
+- **Tested:** The PR was mergeable because the sync was done, and `main` held all features.
+
+### Scenario 6: Only one or two items are unfinished
+- **Problem:** A release branch is too much work for one or two items.
+- **Strategy:** Revert them on `develop`, one PR each, then ship `develop`.
+- **Tested:** `main` got the ready work and none of the reverted work. The work came back two ways: reverting the revert, or adding commits to the original feature branch (kept after its first merge) and opening a new PR. Both worked.
+
+### Scenario 7: Urgent bug in production
+- **Problem:** The fix cannot wait for `develop`, and `develop` must not lose it.
+- **Strategy:** `hotfix/*` from `main` merges into `main` only. A `sync/*` PR then brings it into `develop`, the same step as after a release.
+- **Tested:** With "Automatically delete head branches" on, the hotfix branch was deleted after its merge, and the sync still brought the fix into `develop`. The sync was clean, and unfinished work on `develop` stayed off `main`.
+
+### Scenario 8: Urgent bug while a release is open
+- **Problem:** The open release branch was cut from the old `main`, so it does not contain the fix.
+- **Strategy:** Close the open release PR and cut a new `release/*` from the latest `main`, which already has the fix. Cherry-pick the same commits again, merge, then sync.
+- **Tested:** The new release branch contained the hotfix, the same commit cherry-picked cleanly, and the release PR was mergeable. After the sync, the hotfix change appeared once on `main` and once on `develop`.
+
+## 7. Rules for developers
+
+| Rule | Why |
+|---|---|
+| Ship `develop` to `main` often. | Unfinished work rarely piles up, so a release branch is rarely needed. |
+| Merge into `develop` only work that can ship. Hide unfinished work behind a feature flag, off by default. | `develop` stays shippable without a release branch or a revert. |
+| Remove a feature flag once the feature is live. | Old flags pile up and make the code harder to follow. |
+| Add automated tests in the same PR. Merge only when CI passes. | A passing `develop` can ship without a long manual test cycle. |
+| One feature per PR. Keep it small. | A small squash commit is easy to review, cherry-pick and revert. |
+| State dependencies on other features in the PR description. | A dependent feature can't be cherry-picked alone. It ships with what it depends on. |
+| Never commit to `main`, `develop` or `release/*` directly. Use a PR. | Every change gets reviewed, and the shared branches stay consistent. |
+| Fix release bugs on `develop` first, then cherry-pick. | A fix made on the release branch causes sync conflicts and is lost if the release is rebuilt. |
+| Merge the latest `develop` into your branch before opening the PR. | Conflicts get resolved on your branch, not during the release. |
