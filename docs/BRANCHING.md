@@ -44,7 +44,7 @@ Release and revert are fallbacks for when unfinished work still reaches `develop
 | Branch | Purpose | Cut from | Merges into | PR merge method |
 |---|---|---|---|---|
 | `main` | Production. Always deployable. | | | |
-| `develop` | Staging. Finished features. | | `main` | Merge commit |
+| `develop` | Staging, also called **nonprod**. Features are merged here before they go to production. | | `main` | Merge commit |
 | `feature/*` | Development work | `develop` | `develop` | Squash |
 | `release/*` | Ships only the ready work. Optional. | `main` | `main` | Merge commit |
 | `hotfix/*` | Urgent production fix | `main` | `main` | Merge commit |
