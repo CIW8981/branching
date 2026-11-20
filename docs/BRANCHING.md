@@ -1,6 +1,46 @@
 # Git branching strategy
 
-How the team moves work from development to staging (`develop`) and production (`main`). Start with section 1. Read further only when you need to.
+How the team moves work from development to staging (`develop`) and production (`main`). Start with the diagram and section 1. Read further only when you need to.
+
+```mermaid
+flowchart LR
+    feature["feature/*<br/>development"]
+    develop["develop<br/>staging"]
+    main["main<br/>production"]
+    release["release/*<br/>ready work only"]
+    hotfix["hotfix/*<br/>urgent fix"]
+    sync["sync/*"]
+    revert["revert/*"]
+
+    feature -->|"1. squash PR"| develop
+    develop -->|"2a. merge PR, everything ready"| main
+
+    develop -.->|"2b. cherry-pick ready commits"| release
+    release -->|"merge PR"| main
+
+    develop -->|"2c. cut"| revert
+    revert -->|"squash PR, removes unfinished work"| develop
+
+    main -->|"cut"| hotfix
+    hotfix -->|"3. merge PR"| main
+
+    main -->|"cut after a release or hotfix"| sync
+    sync -->|"merge PR"| develop
+
+    classDef long fill:#1f6feb,stroke:#1f6feb,color:#ffffff
+    classDef prod fill:#d1242f,stroke:#d1242f,color:#ffffff
+    classDef temp fill:#f6f8fa,stroke:#8c959f,color:#24292f
+    class develop long
+    class main prod
+    class feature,release,hotfix,sync,revert temp
+```
+
+- **1:** every feature goes into `develop`.
+- **2a, 2b, 2c:** three ways to ship. 2a when everything on `develop` is ready. 2b when several items are unfinished. 2c when one or two are unfinished: revert them, then 2a.
+- **3:** urgent fixes go straight to `main`.
+- After a release or hotfix, `main` returns to `develop` through `sync/*`.
+- Solid lines are pull requests or new branches. The dotted line is a cherry-pick.
+- A release branch is cut from `main`. If `main` changes while its PR is open, close it and cut a new one.
 
 ## 1. What do I do?
 
@@ -55,16 +95,6 @@ Release and revert are fallbacks for when unfinished work still reaches `develop
 - **Squash** gives one commit per feature, which is easy to cherry-pick and revert.
 - **Merge commit** keeps shared history between `main` and `develop`. GitHub documents that squashing between long-lived branches makes later PRs show old commits again and conflict repeatedly.
 - **Sync** always goes through `sync/*`. A direct `main → develop` PR also works. The team uses one way for consistency, and a conflict can be fixed on the branch.
-
-```
-Normal:   feature/* --squash--> develop --merge--> main
-Release:  main --cut--> release/* <--cherry-pick -x-- develop (ready only)
-          release/* --merge--> main --cut--> sync/* --merge--> develop
-Revert:   develop --cut--> revert/* --squash--> develop --merge--> main
-Hotfix:   main --cut--> hotfix/* --merge--> main --cut--> sync/* --merge--> develop
-Rebuild:  main changed while release PR open: close it, cut new release/* from main
-Conflict: develop --cut--> resolve/* (merge origin/main) --merge--> develop
-```
 
 ## 4. How to
 
